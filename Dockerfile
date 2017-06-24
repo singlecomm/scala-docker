@@ -2,7 +2,7 @@ FROM java:8
 
 MAINTAINER eric.steven.meisel@gmail.com
 
-ENV SCALA_VERSION=2.11.8
+ENV SCALA_VERSION=2.12.2
 
 #Install Scala
 RUN wget "http://www.scala-lang.org/files/archive/scala-${SCALA_VERSION}.tgz" && \
