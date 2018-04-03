@@ -2,7 +2,7 @@ FROM openjdk:8u151-jdk
 
 MAINTAINER eric.steven.meisel@gmail.com
 
-ENV SCALA_VERSION=2.12.4
+ENV SCALA_VERSION=2.12.5
 
 #Install Scala
 RUN wget "http://www.scala-lang.org/files/archive/scala-${SCALA_VERSION}.tgz" && \
