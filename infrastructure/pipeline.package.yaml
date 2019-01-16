@@ -94,6 +94,7 @@ Resources:
             - ecr:BatchGetImage
             - ecr:InitiateLayerUpload
             - ecr:UploadLayerPart
+            - ecr:CompleteLayerUpload
             Effect: Allow
             Resource: '*'
           Version: '2012-10-17'
