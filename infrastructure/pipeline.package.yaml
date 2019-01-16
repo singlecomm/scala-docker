@@ -83,6 +83,17 @@ Resources:
               Resource:
                 Ref: EnvironmentRole
             - Ref: AWS::NoValue
+          - Action:
+            - ecr:GetAuthorizationToken
+            - ecr:BatchCheckLayerAvailability
+            - ecr:GetDownloadUrlForLayer
+            - ecr:GetRepositoryPolicy
+            - ecr:DescribeRepositories
+            - ecr:ListImages
+            - ecr:DescribeImages
+            - ecr:BatchGetImage
+            Effect: Allow
+            Resource: '*'
           Version: '2012-10-17'
         PolicyName:
           Fn::Sub: ${AWS::StackName}
