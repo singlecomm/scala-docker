@@ -1,0 +1,17 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo Installing dependencies...
+      - apt-get update
+      - apt-get install jq uuid-runtime -y
+
+  pre_build:
+    commands:
+      - chmod -R 755 ./scripts
+
+  build:
+    commands:
+      - ./scripts/build
+      - ./scripts/deploy

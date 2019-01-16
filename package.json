@@ -1,0 +1,10 @@
+{
+  "name": "singlecomm/scala-docker",
+  "version": "2.12.6",
+  "description": "Scala with SBT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/singlecomm/scala-docker.git"
+  },
+  "license": "ISC"
+}

@@ -1,0 +1,5 @@
+*.env*
+*.params*
+*.package.yaml
+*.swp
+
