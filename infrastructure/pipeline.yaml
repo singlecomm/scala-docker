@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Build and push pipeline for scala docker image
+Parameters:
+  ArtifactBucketStack:
+    Type: String
+  BranchName:
+    Description: GitHub branch name
+    Type: String
+    Default: master
+  RepositoryName:
+    Description: GitHub repository name
+    Type: String
+    Default: test
+  GitHubOwner:
+    Type: String
+  GitHubSecret:
+    Type: String
+    NoEcho: true
+  GitHubOAuthToken:
+    Type: String
+    NoEcho: true
+  UseEnvironmentRole:
+    Type: String
+    Default: false
+  EnvironmentRole:
+    Type: String
+    Default: "Undefined"
+  ContainerImage:
+    Type: String
+  ComputeType:
+    Type: String
+    AllowedValues:
+      - BUILD_GENERAL1_SMALL
+      - BUILD_GENERAL1_MEDIUM
+      - BUILD_GENERAL1_LARGE
+  BuildSpecPath:
+    Type: String
+
+Conditions:
+  UseEnvironmentRoleCondition: !Equals [ !Ref UseEnvironmentRole, true]
+
+Resources:
+  PipelineWebhook:
+    Type: AWS::CodePipeline::Webhook
+    Properties:
+      Authentication: GITHUB_HMAC
+      AuthenticationConfiguration:
+        SecretToken: !Ref GitHubSecret
+      Filters:
+        - JsonPath: $.ref
+          MatchEquals: 'refs/heads/{Branch}'
+      TargetPipeline: !Ref Pipeline
+      TargetAction: GitHub
+      Name: !Sub ${AWS::StackName}-webhook
+      TargetPipelineVersion: !GetAtt Pipeline.Version
+      RegisterWithThirdParty: true
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub ${AWS::StackName}
+      RoleArn: !GetAtt PipelineExecutionRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !ImportValue
+          Fn::Sub: ${ArtifactBucketStack}-Bucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHub
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref RepositoryName
+                Branch: !Ref BranchName
+                OAuthToken: !Ref GitHubOAuthToken
+                PollForSourceChanges: false
+              OutputArtifacts:
+                - Name: SourceOutput
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: Bake-and-Push
+              InputArtifacts:
+                - Name: SourceOutput
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref BuildRunner
+              OutputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 1
+
+  BuildRunner:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${AWS::StackName}
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Ref ContainerImage
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT
+            Type: PLAINTEXT
+            Value: !Ref AWS::AccountId
+          - !If
+            - UseEnvironmentRoleCondition
+            - Name: ENV_ROLE_ARN
+              Type: PLAINTEXT
+              Value: !Ref EnvironmentRole
+            - !Ref AWS::NoValue
+      ServiceRole: !Ref BuildExecutionRole
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Ref BuildSpecPath
+
+  BuildExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - codebuild.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: !Sub ${AWS::StackName}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource:
+            - !Sub arn:aws:logs:us-east-1:756142810212:log-group:/aws/codebuild/${AWS::StackName}
+            - !Sub arn:aws:logs:us-east-1:756142810212:log-group:/aws/codebuild/${AWS::StackName}:*
+          - Effect: Allow
+            Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:GetObjectVersion
+            Resource:
+            - !Join
+              - ''
+              - - !ImportValue
+                  Fn::Sub: ${ArtifactBucketStack}-Arn
+                - "*"
+          - !If
+            - UseEnvironmentRoleCondition
+            - Effect: Allow
+              Action: sts:AssumeRole
+              Resource: !Ref EnvironmentRole
+            - !Ref AWS::NoValue
+
+  PipelineExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - codepipeline.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: !Sub ${AWS::StackName}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - codedeploy:CreateDeployment
+              - codedeploy:GetApplication
+              - codedeploy:GetApplicationRevision
+              - codedeploy:GetDeployment
+              - codedeploy:GetDeploymentConfig
+              - codedeploy:RegisterApplicationRevision
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - codebuild:BatchGetBuilds
+              - codebuild:StartBuild
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "s3:*"
+            Resource:
+              - !ImportValue
+                Fn::Sub: ${ArtifactBucketStack}-Arn
+              - !Join
+                - ''
+                - - !ImportValue
+                    Fn::Sub: ${ArtifactBucketStack}-Arn
+                  - /*
+
+Outputs: {}

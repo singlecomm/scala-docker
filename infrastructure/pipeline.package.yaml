@@ -1,0 +1,235 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Conditions:
+  UseEnvironmentRoleCondition:
+    Fn::Equals:
+    - Ref: UseEnvironmentRole
+    - true
+Description: Build and push pipeline for scala docker image
+Outputs: {}
+Parameters:
+  ArtifactBucketStack:
+    Type: String
+  BranchName:
+    Default: master
+    Description: GitHub branch name
+    Type: String
+  BuildSpecPath:
+    Type: String
+  ComputeType:
+    AllowedValues:
+    - BUILD_GENERAL1_SMALL
+    - BUILD_GENERAL1_MEDIUM
+    - BUILD_GENERAL1_LARGE
+    Type: String
+  ContainerImage:
+    Type: String
+  EnvironmentRole:
+    Default: Undefined
+    Type: String
+  GitHubOAuthToken:
+    NoEcho: true
+    Type: String
+  GitHubOwner:
+    Type: String
+  GitHubSecret:
+    NoEcho: true
+    Type: String
+  RepositoryName:
+    Default: test
+    Description: GitHub repository name
+    Type: String
+  UseEnvironmentRole:
+    Default: false
+    Type: String
+Resources:
+  BuildExecutionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - codebuild.amazonaws.com
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Effect: Allow
+            Resource:
+            - Fn::Sub: arn:aws:logs:us-east-1:756142810212:log-group:/aws/codebuild/${AWS::StackName}
+            - Fn::Sub: arn:aws:logs:us-east-1:756142810212:log-group:/aws/codebuild/${AWS::StackName}:*
+          - Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:GetObjectVersion
+            Effect: Allow
+            Resource:
+            - Fn::Join:
+              - ''
+              - - Fn::ImportValue:
+                    Fn::Sub: ${ArtifactBucketStack}-Arn
+                - '*'
+          - Fn::If:
+            - UseEnvironmentRoleCondition
+            - Action: sts:AssumeRole
+              Effect: Allow
+              Resource:
+                Ref: EnvironmentRole
+            - Ref: AWS::NoValue
+          Version: '2012-10-17'
+        PolicyName:
+          Fn::Sub: ${AWS::StackName}
+    Type: AWS::IAM::Role
+  BuildRunner:
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+        - Name: AWS_ACCOUNT
+          Type: PLAINTEXT
+          Value:
+            Ref: AWS::AccountId
+        - Fn::If:
+          - UseEnvironmentRoleCondition
+          - Name: ENV_ROLE_ARN
+            Type: PLAINTEXT
+            Value:
+              Ref: EnvironmentRole
+          - Ref: AWS::NoValue
+        Image:
+          Ref: ContainerImage
+        Type: LINUX_CONTAINER
+      Name:
+        Fn::Sub: ${AWS::StackName}
+      ServiceRole:
+        Ref: BuildExecutionRole
+      Source:
+        BuildSpec:
+          Ref: BuildSpecPath
+        Type: CODEPIPELINE
+    Type: AWS::CodeBuild::Project
+  Pipeline:
+    Properties:
+      ArtifactStore:
+        Location:
+          Fn::ImportValue:
+            Fn::Sub: ${ArtifactBucketStack}-Bucket
+        Type: S3
+      Name:
+        Fn::Sub: ${AWS::StackName}
+      RoleArn:
+        Fn::GetAtt:
+        - PipelineExecutionRole
+        - Arn
+      Stages:
+      - Actions:
+        - ActionTypeId:
+            Category: Source
+            Owner: ThirdParty
+            Provider: GitHub
+            Version: 1
+          Configuration:
+            Branch:
+              Ref: BranchName
+            OAuthToken:
+              Ref: GitHubOAuthToken
+            Owner:
+              Ref: GitHubOwner
+            PollForSourceChanges: false
+            Repo:
+              Ref: RepositoryName
+          Name: GitHub
+          OutputArtifacts:
+          - Name: SourceOutput
+          RunOrder: 1
+        Name: Source
+      - Actions:
+        - ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Provider: CodeBuild
+            Version: 1
+          Configuration:
+            ProjectName:
+              Ref: BuildRunner
+          InputArtifacts:
+          - Name: SourceOutput
+          Name: Bake-and-Push
+          OutputArtifacts:
+          - Name: BuildOutput
+          RunOrder: 1
+        Name: Build
+    Type: AWS::CodePipeline::Pipeline
+  PipelineExecutionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - codepipeline.amazonaws.com
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - codedeploy:CreateDeployment
+            - codedeploy:GetApplication
+            - codedeploy:GetApplicationRevision
+            - codedeploy:GetDeployment
+            - codedeploy:GetDeploymentConfig
+            - codedeploy:RegisterApplicationRevision
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - codebuild:BatchGetBuilds
+            - codebuild:StartBuild
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - s3:*
+            Effect: Allow
+            Resource:
+            - Fn::ImportValue:
+                Fn::Sub: ${ArtifactBucketStack}-Arn
+            - Fn::Join:
+              - ''
+              - - Fn::ImportValue:
+                    Fn::Sub: ${ArtifactBucketStack}-Arn
+                - /*
+          Version: '2012-10-17'
+        PolicyName:
+          Fn::Sub: ${AWS::StackName}
+    Type: AWS::IAM::Role
+  PipelineWebhook:
+    Properties:
+      Authentication: GITHUB_HMAC
+      AuthenticationConfiguration:
+        SecretToken:
+          Ref: GitHubSecret
+      Filters:
+      - JsonPath: $.ref
+        MatchEquals: refs/heads/{Branch}
+      Name:
+        Fn::Sub: ${AWS::StackName}-webhook
+      RegisterWithThirdParty: true
+      TargetAction: GitHub
+      TargetPipeline:
+        Ref: Pipeline
+      TargetPipelineVersion:
+        Fn::GetAtt:
+        - Pipeline
+        - Version
+    Type: AWS::CodePipeline::Webhook
