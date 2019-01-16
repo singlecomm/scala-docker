@@ -176,6 +176,7 @@ Resources:
               - ecr:ListImages
               - ecr:DescribeImages
               - ecr:BatchGetImage
+              - ecr:InitiateLayerUpload
             Resource: "*"
 
   PipelineExecutionRole:
