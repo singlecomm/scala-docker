@@ -16,9 +16,8 @@ Parameters:
   GitHubSecret:
     Type: String
     NoEcho: true
-  GitHubOAuthToken:
+  GitHubOAuthParam:
     Type: String
-    NoEcho: true
   ContainerImage:
     Type: String
   ComputeType:
@@ -156,12 +155,6 @@ Resources:
               - - !ImportValue
                   Fn::Sub: ${ArtifactBucketStack}-Arn
                 - "*"
-          - !If
-            - UseEnvironmentRoleCondition
-            - Effect: Allow
-              Action: sts:AssumeRole
-              Resource: !Ref EnvironmentRole
-            - !Ref AWS::NoValue
           - Effect: Allow
             Action:
               - ecr:GetAuthorizationToken
