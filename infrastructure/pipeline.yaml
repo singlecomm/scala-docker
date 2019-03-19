@@ -155,12 +155,6 @@ Resources:
               - - !ImportValue
                   Fn::Sub: ${ArtifactBucketStack}-Arn
                 - "*"
-          - !If
-            - UseEnvironmentRoleCondition
-            - Effect: Allow
-              Action: sts:AssumeRole
-              Resource: !Ref EnvironmentRole
-            - !Ref AWS::NoValue
           - Effect: Allow
             Action:
               - ecr:GetAuthorizationToken
