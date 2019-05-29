@@ -13,9 +13,6 @@ Parameters:
     Default: test
   GitHubOwner:
     Type: String
-  GitHubSecret:
-    Type: String
-    NoEcho: true
   GitHubOAuthParam:
     Type: String
   ContainerImage:
@@ -46,7 +43,7 @@ Resources:
     Properties:
       Authentication: GITHUB_HMAC
       AuthenticationConfiguration:
-        SecretToken: !Ref GitHubSecret
+        SecretToken: !GetAtt GitHubOAuthToken.Value
       Filters:
         - JsonPath: $.ref
           MatchEquals: 'refs/heads/{Branch}'
