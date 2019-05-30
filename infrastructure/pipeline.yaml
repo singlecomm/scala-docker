@@ -15,6 +15,8 @@ Parameters:
     Type: String
   GitHubOAuthParam:
     Type: String
+  GitHubSecretParam:
+    Type: String
   ContainerImage:
     Type: String
   ComputeType:
@@ -38,12 +40,18 @@ Resources:
       ServiceToken: !Ref SecretsLambdaArn
       SSMKey: !Ref GitHubOAuthParam
 
+  GitHubSecret:
+    Type: Custom::GitHubSecret
+    Properties:
+      ServiceToken: !Ref SecretsLambdaArn
+      SSMKey: !Ref GitHubSecretParam
+
   PipelineWebhook:
     Type: AWS::CodePipeline::Webhook
     Properties:
       Authentication: GITHUB_HMAC
       AuthenticationConfiguration:
-        SecretToken: !GetAtt GitHubOAuthToken.Value
+        SecretToken: !GetAtt GitHubSecret.Value
       Filters:
         - JsonPath: $.ref
           MatchEquals: 'refs/heads/{Branch}'
