@@ -13,10 +13,9 @@ Parameters:
     Default: test
   GitHubOwner:
     Type: String
-  GitHubSecret:
-    Type: String
-    NoEcho: true
   GitHubOAuthParam:
+    Type: String
+  GitHubSecretParam:
     Type: String
   ContainerImage:
     Type: String
@@ -41,12 +40,18 @@ Resources:
       ServiceToken: !Ref SecretsLambdaArn
       SSMKey: !Ref GitHubOAuthParam
 
+  GitHubSecret:
+    Type: Custom::GitHubSecret
+    Properties:
+      ServiceToken: !Ref SecretsLambdaArn
+      SSMKey: !Ref GitHubSecretParam
+
   PipelineWebhook:
     Type: AWS::CodePipeline::Webhook
     Properties:
       Authentication: GITHUB_HMAC
       AuthenticationConfiguration:
-        SecretToken: !Ref GitHubSecret
+        SecretToken: !GetAtt GitHubSecret.Value
       Filters:
         - JsonPath: $.ref
           MatchEquals: 'refs/heads/{Branch}'
@@ -136,6 +141,10 @@ Resources:
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource: "*"
           - Effect: Allow
             Action:
               - logs:CreateLogGroup
