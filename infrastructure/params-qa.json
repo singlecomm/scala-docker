@@ -1,7 +1,7 @@
 {
   "Parameters": {
-    "ArtifactBucketStack": "sc-environment-codepipeline-s3-cft-dev",
-    "BranchName": "dev",
+    "ArtifactBucketStack": "sc-environment-codepipeline-s3-cft-qa",
+    "BranchName": "qa",
     "RepositoryName": "scala-docker",
     "GitHubOwner": "singlecomm",
     "GitHubOAuthParam": "/devops/system/github-oauth",
@@ -9,6 +9,6 @@
     "ContainerImage": "aws/codebuild/docker:18.09.0",
     "ComputeType": "BUILD_GENERAL1_SMALL",
     "BuildSpecPath": "pipeline/buildspec.yml",
-    "SecretsLambdaArn": "arn:aws:lambda:us-east-1:756142810212:function:secrets-lambda-dev-SecretsLambda-1S99T81JT7LMI"
+    "SecretsLambdaArn": "arn:aws:lambda:us-east-1:577998122858:function:secrets-lambda-qa-SecretsLambda-7CC9ANTTDQAK"
   }
 }
