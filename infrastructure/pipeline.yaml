@@ -143,6 +143,10 @@ Resources:
           Statement:
           - Effect: Allow
             Action:
+              - lambda:InvokeFunction
+            Resource: "*"
+          - Effect: Allow
+            Action:
               - logs:CreateLogGroup
               - logs:CreateLogStream
               - logs:PutLogEvents
