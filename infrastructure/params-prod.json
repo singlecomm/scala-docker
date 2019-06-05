@@ -9,6 +9,6 @@
     "ContainerImage": "aws/codebuild/docker:18.09.0",
     "ComputeType": "BUILD_GENERAL1_SMALL",
     "BuildSpecPath": "pipeline/buildspec.yml",
-    "SecretsLambdaArn": ""
+    "SecretsLambdaArn": "arn:aws:lambda:us-east-1:655772981054:function:secrets-lambda-prod-SecretsLambda-1SQ7S5R5P1VFG"
   }
 }
